@@ -1,0 +1,9 @@
+/backend/.venv/
+/backend/__pycache__/
+/backend/*.pyc
+/backend/.env
+/backend/*.sqlite3
+/backend/staticfiles/
+/backend/.ruff_cache/
+/backend/docs/
+/backend/README.md
