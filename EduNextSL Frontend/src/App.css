@@ -118,7 +118,7 @@
 
 .auth-form-shell h1 {
   margin: 28px 0 10px;
-  font-size: clamp(2.2rem, 4vw, 4rem);
+  font-size: 28px;
   line-height: 1.05;
   letter-spacing: -0.06em;
   color: #0d1235;
