@@ -101,7 +101,8 @@ def rotate_refresh_token(raw_token: str, meta: RequestMeta) -> TokenPair:
         # Row lock serialises concurrent refreshes with the same token: the loser
         # sees it blacklisted and is treated as reuse.
         outstanding = (
-            OutstandingToken.objects.select_for_update()
+            # of=("self",): PostgreSQL cannot lock the nullable (outer-joined) user side.
+            OutstandingToken.objects.select_for_update(of=("self",))
             .select_related("user")
             .filter(jti=old["jti"])
             .first()

@@ -3,7 +3,16 @@
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
-from .base import ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS, EMAIL_BACKEND, env
+from .base import (
+    ALLOWED_HOSTS,
+    BREVO_API_KEY,
+    BREVO_MODE,
+    CORS_ALLOWED_ORIGINS,
+    DATABASES,
+    EMAIL_BACKEND,
+    STORAGES,
+    env,
+)
 
 DEBUG = False
 
@@ -22,7 +31,20 @@ if _proxy_ssl_header:
 
 if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must list explicit hosts (no '*').")
-if not CORS_ALLOWED_ORIGINS:
-    raise ImproperlyConfigured("CORS_ALLOWED_ORIGINS must list the React app origin(s).")
-if "console" in EMAIL_BACKEND:
-    raise ImproperlyConfigured("EMAIL_URL must point at a real email provider.")
+if "*" in CORS_ALLOWED_ORIGINS:
+    raise ImproperlyConfigured("CORS_ALLOWED_ORIGINS must not contain '*'.")
+if BREVO_API_KEY and not BREVO_MODE:
+    raise ImproperlyConfigured(
+        "BREVO_API_KEY is an SMTP key (xsmtpsib-...), which cannot use Brevo's HTTP API. "
+        "Create an API key (xkeysib-...) in Brevo > SMTP & API, or also set BREVO_SMTP_LOGIN."
+    )
+# Staging may run without a mail provider (password-reset links then go to the logs).
+if env.bool("REQUIRE_REAL_EMAIL", default=True) and not BREVO_MODE and "console" in EMAIL_BACKEND:
+    raise ImproperlyConfigured("Set BREVO_API_KEY (or EMAIL_URL) to send real email.")
+if DATABASES["default"]["ENGINE"].endswith("sqlite3"):
+    raise ImproperlyConfigured("DATABASE_URL must point at PostgreSQL in production/staging.")
+
+STORAGES = {
+    **STORAGES,
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}

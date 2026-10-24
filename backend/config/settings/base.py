@@ -1,5 +1,6 @@
 """Settings shared by every environment. Environment modules override as needed."""
 
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -9,7 +10,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env()
 _env_file = BASE_DIR / ".env"
-if _env_file.exists():
+# The test settings set EDUNEXT_SKIP_DOTENV so tests never depend on a developer's .env.
+if _env_file.exists() and not os.environ.get("EDUNEXT_SKIP_DOTENV"):
     environ.Env.read_env(_env_file)
 
 # --- Core -------------------------------------------------------------------
@@ -17,6 +19,9 @@ if _env_file.exists():
 SECRET_KEY = env("DJANGO_SECRET_KEY")
 DEBUG = False
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=[])
+# Render injects the service hostname; allow it without hand-editing the host list.
+if _render_host := env("RENDER_EXTERNAL_HOSTNAME", default=""):
+    ALLOWED_HOSTS.append(_render_host)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -32,10 +37,12 @@ INSTALLED_APPS = [
     "apps.core",
     "apps.accounts",
     "apps.companies",
+    "apps.media",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -65,7 +72,16 @@ TEMPLATES = [
 ]
 
 DATABASES = {"default": env.db("DATABASE_URL")}
-DATABASES["default"]["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
+_db = DATABASES["default"]
+_db["CONN_MAX_AGE"] = env.int("DB_CONN_MAX_AGE", default=60)
+_db["CONN_HEALTH_CHECKS"] = True  # drop connections the server closed while idle
+if "-pooler" in (_db.get("HOST") or ""):
+    # Neon's pooled endpoint is PgBouncer in transaction mode: no server-side cursors
+    # and no automatic prepared statements.
+    _db["DISABLE_SERVER_SIDE_CURSORS"] = True
+    _db.setdefault("OPTIONS", {})["prepare_threshold"] = None
+if _db["ENGINE"].endswith("postgresql"):
+    _db.setdefault("OPTIONS", {}).setdefault("connect_timeout", 10)
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CACHES = {"default": env.cache("CACHE_URL", default="locmemcache://edunext")}
@@ -77,6 +93,29 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# --- Media uploads (Cloudinary) ----------------------------------------------
+
+CLOUDINARY_NAME = env("CLOUDINARY_NAME", default="")
+CLOUDINARY_API_KEY = env("CLOUDINARY_API_KEY", default="")
+CLOUDINARY_API_SECRET = env("CLOUDINARY_API_SECRET", default="")
+CLOUDINARY_ENABLED = bool(CLOUDINARY_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
+
+MEDIA_ROOT = BASE_DIR / "media"  # only used when Cloudinary is not configured
+MEDIA_URL = "media/"
+STORAGES = {
+    "default": {
+        "BACKEND": "apps.media.storage.CloudinaryStorage"
+        if CLOUDINARY_ENABLED
+        else "django.core.files.storage.FileSystemStorage"
+    },
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
+# The built React app (vite build) that Django serves; see apps/core/spa.py.
+FRONTEND_DIST_DIR = Path(env("FRONTEND_DIST_DIR", default="") or BASE_DIR / "frontend_dist")
+WHITENOISE_ROOT = FRONTEND_DIST_DIR
+WHITENOISE_IMMUTABLE_FILE_TEST = lambda path, url: url.startswith("/assets/")  # noqa: E731
 
 ADMIN_URL = env("DJANGO_ADMIN_URL", default="admin/")
 API_DOCS_ENABLED = env.bool("API_DOCS_ENABLED", default=False)
@@ -130,10 +169,13 @@ AUTH_COOKIE_SECURE = env.bool("AUTH_COOKIE_SECURE", default=True)
 AUTH_COOKIE_SAMESITE = env("AUTH_COOKIE_SAMESITE", default="Lax")
 AUTH_REFRESH_SESSION_HOURS = env.int("JWT_REFRESH_SESSION_HOURS", default=24)
 
+# Social login. The Google web client ID is public; it is served to the SPA by /auth/providers/.
+GOOGLE_OAUTH_CLIENT_ID = env("GOOGLE_OAUTH_CLIENT_ID", default="")
+
 # Legal acceptance: versions are configured, never invented in code.
-LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", default="unspecified")
-LEGAL_USER_AGREEMENT_VERSION = env("LEGAL_USER_AGREEMENT_VERSION", default="unspecified")
-LEGAL_PRIVACY_POLICY_VERSION = env("LEGAL_PRIVACY_POLICY_VERSION", default="unspecified")
+LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", default="") or "unspecified"
+LEGAL_USER_AGREEMENT_VERSION = env("LEGAL_USER_AGREEMENT_VERSION", default="") or "unspecified"
+LEGAL_PRIVACY_POLICY_VERSION = env("LEGAL_PRIVACY_POLICY_VERSION", default="") or "unspecified"
 
 # --- REST framework ---------------------------------------------------------
 
@@ -158,6 +200,7 @@ REST_FRAMEWORK = {
         "password_reset_confirm": env("THROTTLE_RATE_PASSWORD_RESET_CONFIRM", default="10/hour"),
         "token_refresh": env("THROTTLE_RATE_TOKEN_REFRESH", default="60/minute"),
         "social_login": env("THROTTLE_RATE_SOCIAL_LOGIN", default="20/minute"),
+        "upload_signature": env("THROTTLE_RATE_UPLOAD_SIGNATURE", default="60/hour"),
     },
     # Number of reverse proxies in front of Django (0 = trust REMOTE_ADDR only).
     "NUM_PROXIES": env.int("TRUSTED_PROXY_COUNT", default=0),
@@ -189,6 +232,8 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
+# Google Sign-In opens a popup that talks back via postMessage; plain "same-origin" breaks it.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 X_FRAME_OPTIONS = "DENY"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
@@ -204,8 +249,38 @@ EMAIL_HOST_USER = _email.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = _email.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = _email.get("EMAIL_USE_TLS", False)
 EMAIL_USE_SSL = _email.get("EMAIL_USE_SSL", False)
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="EduNext SL <no-reply@example.com>")
+SITE_NAME = "EduNext SL"
+EMAIL_FROM_ADDRESS = env("EMAIL_FROM_ADDRESS", default="no-reply@example.com")
+EMAIL_FROM_NAME = env("EMAIL_FROM_NAME", default=SITE_NAME)
+DEFAULT_FROM_EMAIL = f"{EMAIL_FROM_NAME} <{EMAIL_FROM_ADDRESS}>"
+
+# Brevo. Preferred: an *API key* (starts "xkeysib-") used over HTTPS, which also works on
+# hosts that block SMTP (e.g. Render's free tier). An *SMTP key* ("xsmtpsib-") cannot call the
+# HTTP API; with BREVO_SMTP_LOGIN it is used through Brevo's SMTP relay instead.
+BREVO_API_KEY = env("BREVO_API_KEY", default="").strip()
+BREVO_SMTP_LOGIN = env("BREVO_SMTP_LOGIN", default="").strip()
+BREVO_MODE = ""  # "api", "smtp", or "" (not configured / unusable)
 EMAIL_SENDER_CLASS = "apps.core.email.DjangoEmailSender"
+if BREVO_API_KEY.startswith("xsmtpsib-"):
+    if BREVO_SMTP_LOGIN:
+        BREVO_MODE = "smtp"
+        EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+        EMAIL_HOST, EMAIL_PORT, EMAIL_USE_TLS = "smtp-relay.brevo.com", 587, True
+        EMAIL_HOST_USER, EMAIL_HOST_PASSWORD = BREVO_SMTP_LOGIN, BREVO_API_KEY
+elif BREVO_API_KEY:
+    BREVO_MODE = "api"
+    EMAIL_SENDER_CLASS = "apps.core.email.BrevoEmailSender"
+# Send mail on a background thread so requests never wait on the provider.
+EMAIL_ASYNC = env.bool("EMAIL_ASYNC", default=True)
+# Public brand logo shown in emails (uploaded to Cloudinary at edunext/brand/logo).
+EMAIL_LOGO_URL = env(
+    "EMAIL_LOGO_URL",
+    default=(
+        f"https://res.cloudinary.com/{CLOUDINARY_NAME}/image/upload/edunext/brand/logo.jpg"
+        if CLOUDINARY_NAME
+        else ""
+    ),
+)
 
 FRONTEND_BASE_URL = env("FRONTEND_BASE_URL", default="http://localhost:5173")
 FRONTEND_PASSWORD_RESET_PATH = env("FRONTEND_PASSWORD_RESET_PATH", default="/reset-password")

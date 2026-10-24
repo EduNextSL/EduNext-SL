@@ -1,0 +1,63 @@
+# Render Blueprint: one web service (Django serves the API and the built React app).
+# The database is Neon (external), files are on Cloudinary, email goes through Brevo.
+# Secrets are NOT stored here: every `sync: false` value is entered in the Render dashboard.
+services:
+  - type: web
+    name: edunext-sl
+    runtime: python
+    plan: free
+    region: ohio # same AWS region as the Neon database (us-east-2)
+    rootDir: backend
+    buildCommand: bash build.sh
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 60 --graceful-timeout 30 --access-logfile -
+    healthCheckPath: /api/v1/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      # TLS ends at Render's proxy; trust its forwarded-protocol header.
+      - key: SECURE_PROXY_SSL_HEADER
+        value: HTTP_X_FORWARDED_PROTO,https
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
+      # Shared (database-backed) cache so rate limiting is correct across workers/instances.
+      - key: CACHE_URL
+        value: dbcache://django_cache
+      - key: API_DOCS_ENABLED
+        value: "false"
+      - key: DJANGO_ADMIN_URL
+        sync: false
+      # Neon: DATABASE_URL = POOLED connection string (host contains "-pooler"), used at runtime.
+      # DIRECT_DATABASE_URL = direct connection string, used only for migrations in build.sh.
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_DATABASE_URL
+        sync: false
+      - key: CLOUDINARY_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM_ADDRESS
+        sync: false
+      - key: EMAIL_FROM_NAME
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      # Public URL of this service, e.g. https://edunext-sl.onrender.com (used in email links).
+      - key: FRONTEND_BASE_URL
+        sync: false
+      - key: LEGAL_TERMS_VERSION
+        sync: false
+      - key: LEGAL_USER_AGREEMENT_VERSION
+        sync: false
+      - key: LEGAL_PRIVACY_POLICY_VERSION
+        sync: false

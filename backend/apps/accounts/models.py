@@ -116,3 +116,27 @@ class LegalAcceptance(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user_id} @ {self.accepted_at:%Y-%m-%d}"
+
+
+class SocialAccount(models.Model):
+    """Link between a user and an identity at an external provider (e.g. Google)."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="social_accounts"
+    )
+    provider = models.CharField(max_length=20)
+    subject = models.CharField(max_length=255, help_text="Provider's stable user id.")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["provider", "subject"], name="accounts_socialaccount_identity_unique"
+            ),
+            models.UniqueConstraint(
+                fields=["user", "provider"], name="accounts_socialaccount_user_provider_unique"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.provider}:{self.user_id}"

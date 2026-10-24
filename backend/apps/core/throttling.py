@@ -47,3 +47,17 @@ class TokenRefreshThrottle(IPScopedThrottle):
 
 class SocialLoginThrottle(IPScopedThrottle):
     scope = "social_login"
+
+
+class UploadSignatureThrottle(SimpleRateThrottle):
+    """Per authenticated user (falls back to IP)."""
+
+    scope = "upload_signature"
+
+    def get_cache_key(self, request, view):
+        ident = (
+            request.user.pk
+            if request.user and request.user.is_authenticated
+            else self.get_ident(request)
+        )
+        return self.cache_format % {"scope": self.scope, "ident": ident}

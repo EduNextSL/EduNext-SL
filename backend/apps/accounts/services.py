@@ -17,8 +17,9 @@ from apps.core.exceptions import ApiError, ErrorCode
 from apps.core.models import AuditEvent
 from apps.core.utils import RequestMeta
 
-from .emails import send_password_reset_email
-from .models import LegalAcceptance, StudentProfile, User, UserRole
+from .emails import send_password_reset_email, send_welcome_email
+from .models import LegalAcceptance, SocialAccount, StudentProfile, User, UserRole
+from .social import SocialAuthError, SocialIdentity
 from .tokens import TokenPair, issue_tokens, revoke_all_user_tokens
 from .validators import normalize_email
 
@@ -56,7 +57,9 @@ def _record_legal_acceptance(user: User, meta: RequestMeta) -> None:
     )
 
 
-def _register(*, email: str, password: str, role: str, meta: RequestMeta, create_profile) -> User:
+def _register(
+    *, email: str, password: str | None, role: str, meta: RequestMeta, create_profile
+) -> User:
     """Create user + profile + legal acceptance atomically; map duplicate emails to 409."""
     email = normalize_email(email)
     try:
@@ -70,6 +73,7 @@ def _register(*, email: str, password: str, role: str, meta: RequestMeta, create
         if User.objects.filter(email=email).exists():
             raise EmailAlreadyRegistered from None
         raise
+    send_welcome_email(user)  # after commit; delivery problems are logged, never raised
     return user
 
 
@@ -178,3 +182,75 @@ def complete_password_reset(*, user: User, new_password: str, meta: RequestMeta)
     user.save(update_fields=["password", "updated_at"])
     revoke_all_user_tokens(user)
     record_event(AuditEvent.PASSWORD_RESET_COMPLETED, actor=user, meta=meta)
+
+
+# --- Social login -----------------------------------------------------------
+
+
+class TermsRequired(ApiError):
+    status_code = 400
+    error_code = "TERMS_REQUIRED"
+    default_detail = "You must accept the Terms of Service, User Agreement and Privacy Policy."
+
+    def __init__(self):
+        super().__init__(self.default_detail, errors={"terms_accepted": [self.default_detail]})
+
+
+class SocialEmailInUse(ApiError):
+    status_code = 409
+    error_code = "ACCOUNT_EXISTS"
+    default_detail = (
+        "An account with this email already exists. Sign in with your email and password."
+    )
+
+    def __init__(self):
+        super().__init__(self.default_detail)
+
+
+def social_login(
+    *, identity: SocialIdentity, terms_accepted: bool, remember_me: bool, meta: RequestMeta
+) -> LoginResult:
+    """Sign in with a verified provider identity, creating a student account on first use.
+
+    An existing password account is never auto-linked: registration does not verify
+    email ownership, so linking by email alone would let someone who pre-registered a
+    victim's address keep access after the victim signs in with the provider.
+    """
+    account = (
+        SocialAccount.objects.select_related("user")
+        .filter(provider=identity.provider, subject=identity.subject)
+        .first()
+    )
+    if account is not None:
+        user = account.user
+        if not user.can_authenticate:
+            raise SocialAuthError
+    else:
+        if User.objects.filter(email=identity.email).exists():
+            raise SocialEmailInUse
+        if not terms_accepted:
+            raise TermsRequired
+        user = _register(
+            email=identity.email,
+            password=None,  # unusable until the user runs a password reset
+            role=UserRole.STUDENT,
+            meta=meta,
+            create_profile=lambda new_user: _create_social_student(new_user, identity),
+        )
+    update_last_login(None, user)
+    record_event(
+        AuditEvent.LOGIN_SUCCESS,
+        actor=user,
+        meta=meta,
+        metadata={"provider": identity.provider, "remember_me": remember_me},
+    )
+    return LoginResult(user=user, tokens=issue_tokens(user, remember_me=remember_me))
+
+
+def _create_social_student(user: User, identity: SocialIdentity) -> None:
+    StudentProfile.objects.create(
+        user=user,
+        first_name=identity.first_name or user.email.split("@")[0],
+        last_name=identity.last_name,
+    )
+    SocialAccount.objects.create(user=user, provider=identity.provider, subject=identity.subject)

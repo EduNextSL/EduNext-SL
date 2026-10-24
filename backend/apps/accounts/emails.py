@@ -1,13 +1,15 @@
+from datetime import date
 from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
+from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 
-from apps.core.email import get_email_sender
+from apps.core.email import deliver_email
 
-from .models import User
+from .models import User, UserRole
 
 
 def build_password_reset_url(user: User) -> str:
@@ -17,16 +19,65 @@ def build_password_reset_url(user: User) -> str:
             "token": default_token_generator.make_token(user),
         }
     )
-    base = settings.FRONTEND_BASE_URL.rstrip("/")
-    return f"{base}{settings.FRONTEND_PASSWORD_RESET_PATH}?{query}"
+    return f"{_frontend_url(settings.FRONTEND_PASSWORD_RESET_PATH)}?{query}"
+
+
+def _frontend_url(path: str = "") -> str:
+    return f"{settings.FRONTEND_BASE_URL.rstrip('/')}{path}"
+
+
+def _render(template: str, context: dict) -> tuple[str, str]:
+    """Render the branded HTML and plain-text versions of an email."""
+    base = {
+        "site_name": settings.SITE_NAME,
+        "logo_url": settings.EMAIL_LOGO_URL,
+        "support_email": settings.EMAIL_FROM_ADDRESS,
+        "year": date.today().year,
+    }
+    context = {**base, **context}
+    return (
+        render_to_string(f"emails/{template}.txt", context),
+        render_to_string(f"emails/{template}.html", context),
+    )
 
 
 def send_password_reset_email(user: User) -> None:
-    minutes = settings.PASSWORD_RESET_TIMEOUT // 60
-    body = (
-        "We received a request to reset your EduNext SL password.\n\n"
-        f"Use this link to choose a new password (valid for {minutes} minutes, one use):\n"
-        f"{build_password_reset_url(user)}\n\n"
-        "If you did not request this, you can ignore this email; your password is unchanged."
+    text, html = _render(
+        "password_reset",
+        {
+            "action_url": build_password_reset_url(user),
+            "expires_minutes": settings.PASSWORD_RESET_TIMEOUT // 60,
+        },
     )
-    get_email_sender().send(to=user.email, subject="Reset your EduNext SL password", body=body)
+    deliver_email(
+        to=user.email,
+        subject=f"Reset your {settings.SITE_NAME} password",
+        body=text,
+        html=html,
+    )
+
+
+def send_welcome_email(user: User) -> None:
+    company = getattr(user, "company", None) if user.role == UserRole.EMPLOYER else None
+    student = getattr(user, "student_profile", None) if user.role == UserRole.STUDENT else None
+    name = (
+        company.contact_full_name
+        if company
+        else (student.first_name if student else user.email.split("@")[0])
+    )
+    text, html = _render(
+        "welcome",
+        {
+            "name": name,
+            "email": user.email,
+            "is_company": company is not None,
+            "company_name": company.name if company else "",
+            "action_url": _frontend_url("/login"),
+        },
+    )
+    deliver_email(
+        to=user.email,
+        subject=f"Welcome to {settings.SITE_NAME}",
+        body=text,
+        html=html,
+    )

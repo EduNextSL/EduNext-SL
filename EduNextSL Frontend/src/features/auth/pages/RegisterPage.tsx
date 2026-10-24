@@ -3,17 +3,20 @@ import { AuthLayout } from "../components/AuthLayout";
 import { CompanyRegisterForm } from "../components/CompanyRegisterForm";
 import { StudentRegisterForm } from "../components/StudentRegisterForm";
 import { useTranslation } from "react-i18next";
+import type { User } from "../../../api/auth";
 
 type RegisterPageProps = {
   initialAccountType?: "student" | "company";
   onAccountTypeChange?: (type: "student" | "company") => void;
   onSwitchToLogin: () => void;
+  onAuthenticated: (user: User) => void;
 };
 
 export function RegisterPage({
   initialAccountType = "student",
   onAccountTypeChange,
   onSwitchToLogin,
+  onAuthenticated,
 }: RegisterPageProps) {
   const { t } = useTranslation();
   const [accountType, setAccountType] = useState<"student" | "company">(
@@ -22,11 +25,21 @@ export function RegisterPage({
 
   const form = useMemo(() => {
     if (accountType === "company") {
-      return <CompanyRegisterForm onSwitchToLogin={onSwitchToLogin} />;
+      return (
+        <CompanyRegisterForm
+          onSwitchToLogin={onSwitchToLogin}
+          onAuthenticated={onAuthenticated}
+        />
+      );
     }
 
-    return <StudentRegisterForm onSwitchToLogin={onSwitchToLogin} />;
-  }, [accountType, onSwitchToLogin]);
+    return (
+      <StudentRegisterForm
+        onSwitchToLogin={onSwitchToLogin}
+        onAuthenticated={onAuthenticated}
+      />
+    );
+  }, [accountType, onSwitchToLogin, onAuthenticated]);
 
   const handleAccountTypeChange = (nextType: "student" | "company") => {
     setAccountType(nextType);

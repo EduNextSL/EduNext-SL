@@ -1,87 +1,128 @@
+import { useState, type FormEvent } from "react";
 import { FaFacebookF } from "react-icons/fa";
-import { FcGoogle } from "react-icons/fc";
 import { useTranslation } from "react-i18next";
+import { registerStudent, type User } from "../../../api/auth";
+import { PasswordField } from "../../../components/PasswordField";
+import { TextField } from "../../../components/TextField";
+import { GoogleAuth } from "./GoogleAuth";
+import { firstError, useRegistration } from "./useRegistration";
 
 type StudentRegisterFormProps = {
   onSwitchToLogin: () => void;
+  onAuthenticated: (user: User) => void;
 };
 
 export function StudentRegisterForm({
   onSwitchToLogin,
+  onAuthenticated,
 }: StudentRegisterFormProps) {
   const { t } = useTranslation();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  const { busy, fieldErrors, formError, submit } = useRegistration({
+    register: () =>
+      registerStudent({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: email.trim(),
+        password,
+        password_confirm: passwordConfirm,
+        terms_accepted: termsAccepted,
+      }),
+    email: email.trim(),
+    password,
+    onAuthenticated,
+    onSwitchToLogin,
+  });
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    void submit();
+  }
 
   return (
-    <form className="auth-form auth-form--register">
+    <form className="auth-form auth-form--register" onSubmit={handleSubmit} noValidate>
       <div className="two-col-fields">
-        <label className="auth-field" aria-label={t("common.firstName")}>
-          <input
-            type="text"
-            placeholder={t("common.firstName")}
-            defaultValue=""
-          />
-        </label>
-
-        <label className="auth-field" aria-label={t("common.lastName")}>
-          <input
-            type="text"
-            placeholder={t("common.lastName")}
-            defaultValue=""
-          />
-        </label>
+        <TextField
+          name="first_name"
+          label={t("common.firstName")}
+          value={firstName}
+          onChange={setFirstName}
+          autoComplete="given-name"
+          error={firstError(fieldErrors, "first_name")}
+        />
+        <TextField
+          name="last_name"
+          label={t("common.lastName")}
+          value={lastName}
+          onChange={setLastName}
+          autoComplete="family-name"
+          error={firstError(fieldErrors, "last_name")}
+        />
       </div>
 
-      <label className="auth-field" aria-label={t("common.emailAddress")}>
-        <input
-          type="email"
-          placeholder={t("common.emailAddress")}
-          defaultValue=""
-        />
-      </label>
+      <TextField
+        type="email"
+        name="email"
+        label={t("common.emailAddress")}
+        value={email}
+        onChange={setEmail}
+        autoComplete="email"
+        error={firstError(fieldErrors, "email")}
+      />
 
       <div className="two-col-fields">
-        <label
-          className="auth-field auth-field--password"
-          aria-label={t("common.password")}
-        >
-          <input
-            type="password"
-            placeholder={t("common.password")}
-            defaultValue=""
-          />
-          <span className="field-eye" aria-hidden="true">
-            ◌
-          </span>
-        </label>
-
-        <label
-          className="auth-field auth-field--password"
-          aria-label={t("common.confirmPassword")}
-        >
-          <input
-            type="password"
-            placeholder={t("common.confirmPassword")}
-            defaultValue=""
-          />
-          <span className="field-eye" aria-hidden="true">
-            ◌
-          </span>
-        </label>
+        <PasswordField
+          name="password"
+          label={t("common.password")}
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          error={firstError(fieldErrors, "password")}
+        />
+        <PasswordField
+          name="password_confirm"
+          label={t("common.confirmPassword")}
+          value={passwordConfirm}
+          onChange={setPasswordConfirm}
+          autoComplete="new-password"
+          error={firstError(fieldErrors, "password_confirm")}
+        />
       </div>
 
       <p className="helper-copy">{t("common.passwordHelp")}</p>
 
       <label className="terms-row">
-        <input type="checkbox" />
+        <input
+          type="checkbox"
+          checked={termsAccepted}
+          onChange={(event) => setTermsAccepted(event.target.checked)}
+        />
         <span>
           {t("common.termsPrefix")} <a href="#">{t("common.termsOfService")}</a>
           {t("common.termsMiddle")} <a href="#">{t("common.privacyPolicy")}</a>
           {t("common.termsSuffix")}
         </span>
       </label>
+      {firstError(fieldErrors, "terms_accepted") && (
+        <p className="field-error" role="alert">
+          {firstError(fieldErrors, "terms_accepted")}
+        </p>
+      )}
 
-      <button type="submit" className="primary-button">
-        {t("register.studentSubmit")}
+      {formError && (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      )}
+
+      <button type="submit" className="primary-button" disabled={busy}>
+        {busy ? t("auth.creating") : t("register.studentSubmit")}
       </button>
 
       <p className="switch-copy">
@@ -96,17 +137,13 @@ export function StudentRegisterForm({
       </div>
 
       <div className="social-login-row social-login-row--split">
-        <button
-          type="button"
-          className="social-button social-button--google"
-          aria-label={t("common.googleSignup")}
-        >
-          <FcGoogle aria-hidden="true" />
-        </button>
+        <GoogleAuth termsAccepted={termsAccepted} onSignedIn={onAuthenticated} />
         <button
           type="button"
           className="social-button social-button--facebook"
           aria-label={t("common.facebookSignup")}
+          title={t("auth.comingSoon")}
+          disabled
         >
           <FaFacebookF aria-hidden="true" />
         </button>

@@ -72,7 +72,9 @@ class PasswordResetTests(ApiTestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_email_delivery_failure_does_not_change_response(self):
-        with mock.patch("apps.core.email.send_mail", side_effect=OSError("smtp down")):
+        with mock.patch(
+            "apps.core.email.EmailMultiAlternatives.send", side_effect=OSError("smtp down")
+        ):
             response = self.request_reset()
         self.assertEqual(response.status_code, 200)
 

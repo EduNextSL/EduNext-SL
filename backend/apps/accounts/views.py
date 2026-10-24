@@ -1,3 +1,4 @@
+from django.conf import settings
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import NotFound
@@ -29,9 +30,11 @@ from .serializers import (
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    ProvidersSerializer,
     RefreshedSessionSerializer,
     RegisteredUserSerializer,
     SessionSerializer,
+    SocialLoginSerializer,
     StudentRegistrationSerializer,
     UserSerializer,
 )
@@ -304,23 +307,63 @@ class SocialLoginNotConfigured(ApiError):
         super().__init__(self.default_detail)
 
 
-class SocialLoginView(PublicAPIView):
-    """Placeholder endpoint for Google/Facebook; see apps/accounts/social.py."""
+class ProvidersView(PublicAPIView):
+    """Tells the SPA which social providers are usable (client IDs are public values)."""
 
+    @extend_schema(
+        tags=["auth"],
+        summary="Available social sign-in providers",
+        responses={200: envelope("ProvidersResponse", ProvidersSerializer)},
+    )
+    def get(self, request):
+        google = settings.GOOGLE_OAUTH_CLIENT_ID
+        return success_response(
+            {"google": {"client_id": google} if google else None, "facebook": None}
+        )
+
+
+class SocialLoginView(TrustedOriginMixin, PublicAPIView):
     throttle_classes = [SocialLoginThrottle]
 
     @extend_schema(
         tags=["auth"],
-        summary="Social login (not yet available)",
-        description="Returns 501 until provider credentials and account-linking rules are configured.",
-        request=None,
+        summary="Sign in or sign up with Google",
+        description=(
+            "Send the Google ID token (`credential`). The server verifies it with Google. "
+            "Existing social users are logged in; unknown emails create a student account "
+            "(requires `terms_accepted`, otherwise 400 `TERMS_REQUIRED`). An email that already "
+            "has a password account returns 409 `ACCOUNT_EXISTS`. Same success payload as login."
+        ),
+        request=SocialLoginSerializer,
         responses={
+            200: SessionResponse,
+            400: VALIDATION_ERROR,
+            401: error("Provider credential rejected (`SOCIAL_AUTH_FAILED`)."),
+            403: error("Origin not allowed (`PERMISSION_DENIED`)."),
             404: error("Unknown provider (`NOT_FOUND`)."),
+            409: error("Email already has a password account (`ACCOUNT_EXISTS`)."),
             501: error("Provider not configured (`NOT_IMPLEMENTED`)."),
+            429: THROTTLED,
         },
     )
     def post(self, request, provider: str):
         if provider not in social.SocialProvider.ALL:
             raise NotFound
-        # Once a verifier is registered, verify the credential and log the user in here.
-        raise SocialLoginNotConfigured
+        verifier = social.get_verifier(provider)
+        if verifier is None:
+            raise SocialLoginNotConfigured
+        serializer = SocialLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        identity = verifier.verify(data["credential"])
+        result = services.social_login(
+            identity=identity,
+            terms_accepted=data["terms_accepted"],
+            remember_me=data["remember_me"],
+            meta=request_meta(request),
+        )
+        response = success_response(
+            {**_session_payload(result.tokens), "user": UserSerializer(result.user).data}
+        )
+        set_refresh_cookie(response, result.tokens)
+        return response

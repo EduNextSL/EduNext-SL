@@ -1,0 +1,9 @@
+{% autoescape off %}Welcome to {{ site_name }}, {{ name }}!
+
+{% if is_company %}Your company account for {{ company_name }} has been created. Companies are reviewed before they can post opportunities; your account is pending verification and we will let you know once it is approved.{% else %}Your student account is ready. Your next opportunity starts here: explore past questions, internships and scholarships, and connect with employers.{% endif %}
+
+Sign in: {{ action_url }}
+Your sign-in email: {{ email }}
+
+Need help? {{ support_email }}
+{% endautoescape %}

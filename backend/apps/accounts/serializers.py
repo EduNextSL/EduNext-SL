@@ -99,6 +99,25 @@ class LoginSerializer(serializers.Serializer):
     remember_me = serializers.BooleanField(default=False)
 
 
+class SocialLoginSerializer(serializers.Serializer):
+    credential = serializers.CharField(
+        max_length=4096, help_text="Provider ID token (Google `credential`)."
+    )
+    terms_accepted = serializers.BooleanField(
+        default=False, help_text="Required only when this sign-in creates a new account."
+    )
+    remember_me = serializers.BooleanField(default=False)
+
+
+class ProviderConfigSerializer(serializers.Serializer):
+    client_id = serializers.CharField()
+
+
+class ProvidersSerializer(serializers.Serializer):
+    google = ProviderConfigSerializer(allow_null=True)
+    facebook = ProviderConfigSerializer(allow_null=True)
+
+
 # --- Password reset ---------------------------------------------------------
 
 

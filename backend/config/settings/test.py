@@ -6,6 +6,7 @@ so the suite runs anywhere. No real secrets live here.
 
 import os
 
+os.environ["EDUNEXT_SKIP_DOTENV"] = "1"
 os.environ.setdefault(
     "DJANGO_SECRET_KEY", "test-only-secret-key-not-for-any-real-environment-0123456789"
 )
@@ -30,3 +31,17 @@ REST_FRAMEWORK = {
         for scope in REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]  # noqa: F405
     },
 }
+
+# The suite must never reach real services, whatever .env contains.
+BREVO_API_KEY = ""
+BREVO_MODE = ""
+EMAIL_SENDER_CLASS = "apps.core.email.DjangoEmailSender"
+EMAIL_ASYNC = False
+CLOUDINARY_NAME = CLOUDINARY_API_KEY = CLOUDINARY_API_SECRET = ""
+CLOUDINARY_ENABLED = False
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+GOOGLE_OAUTH_CLIENT_ID = ""
+EMAIL_LOGO_URL = ""

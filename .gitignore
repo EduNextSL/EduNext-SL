@@ -191,3 +191,6 @@ tempCodeRunnerFile.py
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Built React app served by Django
+/backend/frontend_dist/

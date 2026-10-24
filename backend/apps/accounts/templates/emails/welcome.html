@@ -1,0 +1,15 @@
+{% extends "emails/base.html" %}
+{% block content %}
+<h1 style="margin:0 0 16px 0;font-size:22px;color:#31315f;">Welcome to {{ site_name }}, {{ name }}!</h1>
+{% if is_company %}
+<p style="margin:0 0 16px 0;">Your company account for <strong>{{ company_name }}</strong> has been created.</p>
+<p style="margin:0 0 20px 0;">Our team reviews every company before it can post opportunities. Your account is currently <strong>pending verification</strong>; we will let you know once it is approved.</p>
+{% else %}
+<p style="margin:0 0 16px 0;">Your student account is ready. Your next opportunity starts here.</p>
+<p style="margin:0 0 20px 0;">Explore past questions, internships and scholarships, and connect with employers looking for talent like you.</p>
+{% endif %}
+<p style="margin:0 0 24px 0;text-align:center;">
+  <a href="{{ action_url }}" style="display:inline-block;background:#31315f;color:#ffffff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:5px;">Go to {{ site_name }}</a>
+</p>
+<p style="margin:0;font-size:14px;color:#6b7280;">Your sign-in email is {{ email }}.</p>
+{% endblock %}

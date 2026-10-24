@@ -21,5 +21,6 @@ urlpatterns = [
         views.PasswordResetConfirmView.as_view(),
         name="password-reset-confirm",
     ),
+    path("providers/", views.ProvidersView.as_view(), name="providers"),
     path("social/<str:provider>/", views.SocialLoginView.as_view(), name="social-login"),
 ]
