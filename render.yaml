@@ -50,8 +50,6 @@ services:
         sync: false
       - key: EMAIL_FROM_NAME
         sync: false
-      - key: GOOGLE_OAUTH_CLIENT_ID
-        sync: false
       # Public URL of this service, e.g. https://edunext-sl.onrender.com (used in email links).
       - key: FRONTEND_BASE_URL
         sync: false
