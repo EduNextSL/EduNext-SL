@@ -44,6 +44,10 @@
   z-index: 1;
 }
 
+.auth-shell--register {
+  min-height: 920px;
+}
+
 /* .auth-shell::before {
   content: "";
   position: absolute;
@@ -97,6 +101,12 @@
   z-index: 3;
 }
 
+.auth-shell--register .auth-panel--form {
+  width: min(60%, 740px);
+  min-height: 0;
+  padding: 32px 40px;
+}
+
 .auth-brand {
   width: fit-content;
   margin: 0 auto 2px;
@@ -116,9 +126,13 @@
   margin: 0 auto;
 }
 
+.auth-shell--register .auth-form-shell {
+  max-width: 560px;
+}
+
 .auth-form-shell h1 {
   margin: 28px 0 10px;
-  font-size: clamp(2.2rem, 4vw, 4rem);
+  font-size: 28px;
   line-height: 1.05;
   letter-spacing: -0.06em;
   color: #0d1235;
@@ -372,7 +386,7 @@
 }
 
 .auth-shell--register .auth-panel--promo {
-  min-height: 980px;
+  min-height: 920px;
 }
 
 .promo-pattern {
@@ -506,12 +520,21 @@
     min-height: 0;
   }
 
+  .auth-shell--register {
+    min-height: 0;
+  }
+
   .auth-panel--form {
     position: relative;
     inset: auto;
     transform: none;
     width: 100%;
     min-height: 0;
+    padding: 36px;
+  }
+
+  .auth-shell--register .auth-panel--form {
+    width: 100%;
     padding: 36px;
   }
 
