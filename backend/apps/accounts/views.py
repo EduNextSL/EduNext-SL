@@ -317,8 +317,12 @@ class ProvidersView(PublicAPIView):
     )
     def get(self, request):
         google = settings.GOOGLE_OAUTH_CLIENT_ID
+        facebook = settings.FACEBOOK_APP_ID if settings.FACEBOOK_APP_SECRET else ""
         return success_response(
-            {"google": {"client_id": google} if google else None, "facebook": None}
+            {
+                "google": {"client_id": google} if google else None,
+                "facebook": {"client_id": facebook} if facebook else None,
+            }
         )
 
 
@@ -327,9 +331,10 @@ class SocialLoginView(TrustedOriginMixin, PublicAPIView):
 
     @extend_schema(
         tags=["auth"],
-        summary="Sign in or sign up with Google",
+        summary="Sign in or sign up with Google or Facebook",
         description=(
-            "Send the Google ID token (`credential`). The server verifies it with Google. "
+            "Send the provider credential: the Google ID token, or the Facebook user access token "
+            "(`credential`). The server verifies it with the provider. "
             "Existing social users are logged in; unknown emails create a student account "
             "(requires `terms_accepted`, otherwise 400 `TERMS_REQUIRED`). An email that already "
             "has a password account returns 409 `ACCOUNT_EXISTS`. Same success payload as login."
@@ -342,6 +347,7 @@ class SocialLoginView(TrustedOriginMixin, PublicAPIView):
             403: error("Origin not allowed (`PERMISSION_DENIED`)."),
             404: error("Unknown provider (`NOT_FOUND`)."),
             409: error("Email already has a password account (`ACCOUNT_EXISTS`)."),
+            # 400 also covers `SOCIAL_EMAIL_REQUIRED` (Facebook shared no email).
             501: error("Provider not configured (`NOT_IMPLEMENTED`)."),
             429: THROTTLED,
         },

@@ -44,4 +44,6 @@ STORAGES = {
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 GOOGLE_OAUTH_CLIENT_ID = ""
+FACEBOOK_APP_ID = ""
+FACEBOOK_APP_SECRET = ""
 EMAIL_LOGO_URL = ""

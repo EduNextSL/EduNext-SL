@@ -64,13 +64,16 @@ export function login(email: string, password: string, rememberMe: boolean) {
   );
 }
 
-export function loginWithGoogle(
+export type SocialProvider = "google" | "facebook";
+
+export function loginWithSocial(
+  provider: SocialProvider,
   credential: string,
   termsAccepted: boolean,
   rememberMe: boolean,
 ) {
   return startSession(
-    request<Session>("/auth/social/google/", {
+    request<Session>(`/auth/social/${provider}/`, {
       method: "POST",
       body: { credential, terms_accepted: termsAccepted, remember_me: rememberMe },
     }),

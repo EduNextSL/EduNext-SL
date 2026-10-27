@@ -1,10 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { FaFacebookF } from "react-icons/fa";
 import { useTranslation } from "react-i18next";
 import { registerStudent, type User } from "../../../api/auth";
 import { PasswordField } from "../../../components/PasswordField";
 import { TextField } from "../../../components/TextField";
-import { GoogleAuth } from "./GoogleAuth";
+import { SocialButtons } from "./SocialButtons";
 import { firstError, useRegistration } from "./useRegistration";
 
 type StudentRegisterFormProps = {
@@ -136,18 +135,7 @@ export function StudentRegisterForm({
         <span>{t("register.divider")}</span>
       </div>
 
-      <div className="social-login-row social-login-row--split">
-        <GoogleAuth termsAccepted={termsAccepted} onSignedIn={onAuthenticated} />
-        <button
-          type="button"
-          className="social-button social-button--facebook"
-          aria-label={t("common.facebookSignup")}
-          title={t("auth.comingSoon")}
-          disabled
-        >
-          <FaFacebookF aria-hidden="true" />
-        </button>
-      </div>
+      <SocialButtons split termsAccepted={termsAccepted} onSignedIn={onAuthenticated} />
     </form>
   );
 }

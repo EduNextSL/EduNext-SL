@@ -1,5 +1,7 @@
 """Production hardening. Staging inherits this and relaxes only what it must."""
 
+from urllib.parse import urlparse
+
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
@@ -10,6 +12,7 @@ from .base import (
     CORS_ALLOWED_ORIGINS,
     DATABASES,
     EMAIL_BACKEND,
+    FRONTEND_BASE_URL,
     STORAGES,
     env,
 )
@@ -28,6 +31,17 @@ AUTH_COOKIE_SECURE = True
 _proxy_ssl_header = env.tuple("SECURE_PROXY_SSL_HEADER", default=())
 if _proxy_ssl_header:
     SECURE_PROXY_SSL_HEADER = _proxy_ssl_header
+
+# Links in emails (password reset, welcome) must point at the public site, never localhost.
+# A localhost value usually means the local .env was copied to the host; prefer the URL the
+# host itself reports (Render sets RENDER_EXTERNAL_URL) and otherwise refuse to start.
+if urlparse(FRONTEND_BASE_URL).hostname in ("localhost", "127.0.0.1", "::1"):
+    FRONTEND_BASE_URL = env("RENDER_EXTERNAL_URL", default="")
+    if not FRONTEND_BASE_URL:
+        raise ImproperlyConfigured(
+            "FRONTEND_BASE_URL points at localhost; set it to the public site URL "
+            "(e.g. https://edunextsl.onrender.com)."
+        )
 
 if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
     raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must list explicit hosts (no '*').")

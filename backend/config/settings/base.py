@@ -171,6 +171,9 @@ AUTH_REFRESH_SESSION_HOURS = env.int("JWT_REFRESH_SESSION_HOURS", default=24)
 
 # Social login. The Google web client ID is public; it is served to the SPA by /auth/providers/.
 GOOGLE_OAUTH_CLIENT_ID = env("GOOGLE_OAUTH_CLIENT_ID", default="")
+# Facebook Login: the app ID is public (served to the SPA); the app secret stays server-side.
+FACEBOOK_APP_ID = env("FACEBOOK_APP_ID", default="")
+FACEBOOK_APP_SECRET = env("FACEBOOK_APP_SECRET", default="")
 
 # Legal acceptance: versions are configured, never invented in code.
 LEGAL_TERMS_VERSION = env("LEGAL_TERMS_VERSION", default="") or "unspecified"

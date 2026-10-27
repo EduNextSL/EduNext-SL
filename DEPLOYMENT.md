@@ -73,11 +73,27 @@ Welcome emails (student/company variants) and password-reset emails are sent thr
 logo (Cloudinary asset `edunext/brand/logo`), a call-to-action button and a plain-text alternative. They are sent
 on a background thread, so a provider outage never slows or fails a request (failures are logged, never raised).
 
-## 6. Google sign-in
+## 6. Google and Facebook sign-in
 
-A first Google sign-in creates a **student** account after the user accepts the terms; returning users just sign
-in. If the Google email already belongs to a password account the API answers `409 ACCOUNT_EXISTS` (no auto-linking,
-because registration does not verify email ownership).
+A first social sign-in creates a **student** account after the user accepts the terms; returning users just sign
+in. If the email already belongs to a password account (or to the other provider) the API answers
+`409 ACCOUNT_EXISTS` (no auto-linking, because registration does not verify email ownership). If Facebook shares no
+email the API answers `400 SOCIAL_EMAIL_REQUIRED`.
+
+**Facebook setup (one time)**
+1. https://developers.facebook.com → My Apps → **Create App** → use case *Authenticate and request data from users
+   with Facebook Login* → app type *Consumer*.
+2. Add the **Facebook Login** product → Settings: enable *Login with the JavaScript SDK* and add your site
+   (`https://edunextsl.onrender.com`, plus `http://localhost:8000`/`http://localhost:5173` for development) to
+   *Allowed Domains for the JavaScript SDK*.
+3. App Settings → Basic: copy **App ID** and **App Secret** into `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET`
+   (locally in `backend/.env`, on Render in the dashboard). Add a *Privacy Policy URL* and a contact email there too.
+4. While the app is in **Development mode** only people added under App Roles (admins/developers/testers) can sign in.
+   To open it to everyone, switch the app to **Live**. The `email` and `public_profile` permissions work without
+   App Review for basic Facebook Login.
+
+The browser sends Facebook's access token; the backend verifies it with Facebook (it must be issued to your app and
+belong to the profile it reads) using the App Secret, which never leaves the server.
 
 ## 7. Known limits
 

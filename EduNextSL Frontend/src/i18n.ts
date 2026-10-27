@@ -19,6 +19,11 @@ const resources = {
         comingSoon: "Coming soon",
         googleUnavailable: "Google sign-in is not configured yet",
         googleLoadFailed: "Google sign-in could not be loaded. Check your connection.",
+        facebookUnavailable: "Facebook sign-in is not configured yet",
+        facebookLoadFailed: "Facebook sign-in could not be loaded. Check your connection.",
+        facebookCancelled: "Facebook sign-in was cancelled.",
+        socialTermsPrompt:
+          "I agree to the Terms of Service, User Agreement and Privacy Policy, and want to create a student account.",
         googleTermsPrompt:
           "I agree to the Terms of Service, User Agreement and Privacy Policy, and want to create a student account with Google.",
         welcome: "Welcome, {{name}}",

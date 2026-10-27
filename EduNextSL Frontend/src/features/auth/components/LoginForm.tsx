@@ -1,11 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { FaFacebookF } from "react-icons/fa";
 import { useTranslation } from "react-i18next";
 import { login, type User } from "../../../api/auth";
 import { ApiError } from "../../../api/client";
 import { PasswordField } from "../../../components/PasswordField";
 import { TextField } from "../../../components/TextField";
-import { GoogleAuth } from "./GoogleAuth";
+import { SocialButtons } from "./SocialButtons";
 
 type LoginFormProps = {
   onSwitchToRegister: () => void;
@@ -89,18 +88,7 @@ export function LoginForm({
         <span>{t("login.divider")}</span>
       </div>
 
-      <div className="social-login-row">
-        <GoogleAuth rememberMe={rememberMe} onSignedIn={onAuthenticated} />
-        <button
-          type="button"
-          className="social-button social-button--facebook"
-          aria-label={t("login.facebook")}
-          title={t("auth.comingSoon")}
-          disabled
-        >
-          <FaFacebookF aria-hidden="true" />
-        </button>
-      </div>
+      <SocialButtons rememberMe={rememberMe} onSignedIn={onAuthenticated} />
 
       <p className="switch-copy">
         {t("login.noAccount")}{" "}
